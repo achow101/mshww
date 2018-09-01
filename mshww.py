@@ -178,7 +178,24 @@ def createwallet(args):
     return {'success' : True}
 
 def newaddress(args):
-    pass
+    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(args.wallet))
+    # Read the wallet file
+    with open(wallet_file, 'r') as f:
+        wallet = json.load(f)
+
+    # Fetch the next address
+    keypool = wallet['external_keypool']
+    next_index = wallet['external_next']
+    addr = keypool[next_index]
+
+    # Increment the next address index
+    wallet['external_next'] += 1
+
+    # Write to the wallet
+    with open(wallet_file, 'w') as f:
+        wallet = json.dump(wallet, f, indent=2)
+
+    return {'addr' : addr}
 
 def listused(args):
     pass
