@@ -175,6 +175,8 @@ def createwallet(args):
     with open(wallet_file, 'x') as f:
         json.dump(data, f, indent=2)
 
+    return {'success' : True}
+
 def newaddress(args):
     pass
 
