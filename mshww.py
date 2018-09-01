@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
-from os.path import expanduser
 from hwilib.commands import process_commands as hwi_command
 
 import argparse
@@ -9,6 +8,7 @@ import sys
 import json
 import urllib
 import binascii
+import os
 
 def enumerate(args):
     return hwi_command(['enumerate'])
@@ -40,7 +40,7 @@ def LoadWalletAndGetRPC(wallet_name, port, user, password):
 def ProcessImportMultiString(importkeys):
     pubkeys = []
     for single_import in importkeys:
-        pubkeys.append(single_import['pubkeys'])
+        pubkeys.append(single_import['pubkeys'][0])
     return pubkeys
 
 def CreateWalletKeypool(args, wrpc, devices, internal):
@@ -101,12 +101,10 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
     print("Getting Multisig addresses")
     ms_addrs = []
     for keys in multisig_keys:
-        print(keys)
         cms_list = []
         for key in keys:
-            [(pubkey, origin)] = key[0]
+            [(pubkey, origin)] = key.items()
             cms_list.append(pubkey)
-        print(cms_list)
         ms = wrpc.createmultisig(args.n_sigs, cms_list)
         ms_addrs.append(ms['address'])
 
@@ -147,7 +145,7 @@ def createwallet(args):
     # Add the device info
     print("Getting device info")
     device_info = {}
-    for dtype, d in devices:
+    for dtype, d in devices.items():
         d_meta = {}
         if dtype == 'core':
             d_meta['wallet_name'] = d['wallet_name']
@@ -171,7 +169,9 @@ def createwallet(args):
     data['devices'] = device_info
 
     print("Writing wallet file")
-    wallet_file = expanduser("~/.mshww/{}.json".format(args.wallet))
+    if not os.path.exists(os.path.expanduser("~/.mshww/")):
+        os.makedirs(os.path.expanduser("~/.mshww/"))
+    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(args.wallet))
     with open(wallet_file, 'x') as f:
         json.dump(data, f, indent=2)
 
