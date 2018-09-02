@@ -277,6 +277,11 @@ def newaddress(args):
     out = {}
     out['addr'] = addr
 
+    # Top up the keypool
+    topup_res = topupkeypool(args)
+    if not topup_res['success']:
+        out['warning'] = 'Failed to refill keypool: {}'.format(topup_res['error'])
+
     # Add the label to the wallet
     if args.label:
         if args.rpcpassword and args.rpcuser:
