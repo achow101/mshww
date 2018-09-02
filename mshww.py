@@ -193,7 +193,18 @@ def newaddress(args):
     with open(wallet_file, 'w') as f:
         wallet = json.dump(wallet, f, indent=2)
 
-    return {'addr' : addr}
+    out = {}
+    out['addr'] = addr
+
+    # Add the label to the wallet
+    if args.label:
+        if args.rpcpassword and args.rpcuser:
+            rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
+            rpc.setlabel(addr, args.label)
+        else:
+            out['error'] = '--rpcuser and --rpcpassword necessary to set a label'
+
+    return out
 
 def listused(args):
     pass
