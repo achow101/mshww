@@ -281,9 +281,10 @@ def newaddress(args):
     out['addr'] = addr
 
     # Top up the keypool
-    topup_res = topupkeypool(args)
-    if not topup_res['success']:
-        out['warning'] = 'Failed to refill keypool: {}'.format(topup_res['error'])
+    if args.notopup:
+        topup_res = topupkeypool(args)
+        if not topup_res['success']:
+            out['warning'] = 'Failed to refill keypool: {}'.format(topup_res['error'])
 
     # Add the label to the wallet
     if args.label:
@@ -329,6 +330,7 @@ def process_commands(args):
     newaddr_parser = subparsers.add_parser('getnewaddress', help='Gets the next address in the address pool')
     newaddr_parser.add_argument('wallet', help='Name of the wallet')
     newaddr_parser.add_argument('--label', help='A label for the address')
+    newaddr_parser.add_argument('--notopup', help='Top up the keypool', action='store_false')
     newaddr_parser.set_defaults(func=newaddress)
 
     listused_parser = subparsers.add_parser('listused', help='List the addresses that have been used')
