@@ -296,7 +296,13 @@ def newaddress(args):
     return out
 
 def listused(args):
-    pass
+    wallet = load_wallet_file(args.wallet)
+    keypool = wallet['external_keypool']
+    next_index = wallet['external_next']
+    out = []
+    for i in range(0, next_index):
+        out.append(keypool[i])
+    return out
 
 def send(args):
     pass
@@ -327,7 +333,6 @@ def process_commands(args):
 
     listused_parser = subparsers.add_parser('listused', help='List the addresses that have been used')
     listused_parser.add_argument('wallet', help='Name of the wallet')
-    listused_parser.add_argument('path', help='The BIP 32 derivation path to derive the key at')
     listused_parser.set_defaults(func=listused)
 
     signmsg_parser = subparsers.add_parser('send', help='Send Bitcoin to specified addresses')
