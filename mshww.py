@@ -125,6 +125,12 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
     return ms_addrs
 
 def createwallet(args):
+    # Error if no rpc user and pass
+    if not args.rpcuser or not args.rpcpassword:
+        out = {'success' : False}
+        out['error'] = '--rpcuser nad --rpcpassword must be specified in order to create a new wallet'
+        return out
+
     devices = json.loads(args.devices)
 
     # Generate the keypools
