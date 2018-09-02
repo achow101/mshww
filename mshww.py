@@ -174,8 +174,8 @@ def createwallet(args):
 
     # Generate the keypools
     wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-    external = CreateWalletKeypool(args, wrpc, devices, 0, 99, False)
-    internal = CreateWalletKeypool(args, wrpc, devices, 0, 99, True)
+    external = generate_keypool(args, wrpc, devices, 0, 99, False)
+    internal = generate_keypool(args, wrpc, devices, 0, 99, True)
     data = {}
     data['external_keypool'] = external
     data['internal_keypool'] = internal
