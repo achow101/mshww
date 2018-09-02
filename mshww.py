@@ -10,6 +10,16 @@ import urllib
 import binascii
 import os
 
+def get_rpc_port(args):
+    # Get the correct port
+    if args.testnet:
+        port = 18332
+    elif args.regtest:
+        port = 18443
+    else:
+        port = 8332
+    return port
+
 def enumerate(args):
     return hwi_command(['enumerate'])
 
@@ -47,14 +57,7 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
     pubkeys = []
     for dtype, d in devices.items():
         if dtype == 'core':
-            # Get the correct port
-            if args.testnet:
-                port = 18332
-            elif args.regtest:
-                port = 18443
-            else:
-                port = 8332
-            rpc = LoadWalletAndGetRPC(d['wallet_name'], port, args.rpcuser, args.rpcpassword)
+            rpc = LoadWalletAndGetRPC(d['wallet_name'], get_rpc_port(args), args.rpcuser, args.rpcpassword)
             
             # Get 1000 pubkeys
             core_pubkeys = []
@@ -124,16 +127,8 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
 def createwallet(args):
     devices = json.loads(args.devices)
 
-    # Get the correct port
-    if args.testnet:
-        port = 18332
-    elif args.regtest:
-        port = 18443
-    else:
-        port = 8332
-
     # Generate the keypools
-    wrpc = CreateWalletAndGetRPC(args.wallet, port, args.rpcuser, args.rpcpassword)
+    wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
     external = CreateWalletKeypool(args, wrpc, devices, False)
     internal = CreateWalletKeypool(args, wrpc, devices, True)
     data = {}
