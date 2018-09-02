@@ -218,7 +218,47 @@ def createwallet(args):
     return {'success' : True}
 
 def topupkeypool(args):
-    pass
+    # Error if no rpc user and pass
+    if not args.rpcuser or not args.rpcpassword:
+        out = {'success' : False}
+        out['error'] = '--rpcuser nad --rpcpassword must be specified in order to top up the keypool'
+        return out
+
+    # Load the watch only wallet
+    rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
+
+    # Load the wallet file and get keypool info
+    wallet = load_wallet_file(args.wallet)
+    external_start = len(wallet['external_keypool'])
+    internal_start = len(wallet['internal_keypool'])
+    external_end = wallet['external_next'] + 100
+    internal_end = wallet['internal_next'] + 100
+
+    # For each of the devices, find the device paths and create the dict
+    devices = {}
+    for dtype, d in wallet['devices']:
+        if dtype == 'core':
+            devices['core'] == d
+        else:
+            path = find_device_path(args, dtype, d['xpub'], d['password'] if 'password' in d else '')
+            if not path:
+                out = {'success' : False}
+                out['error'] = 'Could not find a device with the xpub {}'.format(d['xpub'])
+                return out
+
+            devices[dtype]['device_path'] = path
+            if 'password' in d:
+                devices[dtype]['password'] = d['password']
+
+    # Generate the keypools
+    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False)
+    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True)
+    wallet['external_keypool'] += external_addrs
+    wallet['internal_keypool'] += internal_addrs
+
+    # Write to the wallet
+    write_wallet_to_file(args.wallet, wallet)
+    return {'success' : True}
 
 def newaddress(args):
     wallet = load_wallet_file(args.wallet)
