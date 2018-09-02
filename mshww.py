@@ -31,6 +31,30 @@ def load_wallet_file(wallet_file):
 def enumerate(args):
     return hwi_command(['enumerate'])
 
+def find_device_path(args, dtype, xpub, password = ''):
+    devices = enumerate([])
+    for device in devices:
+        # Check devices with the same type
+        if device['type'] == dtype:
+            # Fetch the master xpub from the device
+            hwi_args = []
+            if args.testnet or args.regtest:
+                hwi_args.append('--testnet')
+            hwi_args.append('-t')
+            hwi_args.append(device['type'])
+            hwi_args.append('-d')
+            hwi_args.append(device['path'])
+            if password:
+                hwi_args.append('-p')
+                hwi_args.append(password)
+            hwi_args.append('getmasterxpub')
+            d_xpub = hwi_command(hwi_args)['xpub']
+
+            # If the xpub matches, then we found our device
+            if d_xpub == xpub:
+                return device['path']
+    return ''
+
 def CreateWalletAndGetRPC(wallet_name, port, user, password):
     print("Making Core wallet")
     rpc = AuthServiceProxy("http://{}:{}@127.0.0.1:{}".format(user, password, port))
