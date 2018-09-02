@@ -65,7 +65,7 @@ def find_device_path(args, dtype, xpub, password = ''):
 def CreateWalletAndGetRPC(wallet_name, port, user, password):
     print("Making Core wallet")
     rpc = AuthServiceProxy("http://{}:{}@127.0.0.1:{}".format(user, password, port))
-    rpc.createwallet(wallet_name)
+    rpc.createwallet(wallet_name, True)
 
     wallet_path = "/wallet/{}".format(urllib.parse.quote(wallet_name))
     return AuthServiceProxy("http://{}:{}@127.0.0.1:{}{}".format(user, password, port, wallet_path))
