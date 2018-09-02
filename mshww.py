@@ -92,7 +92,7 @@ def ProcessImportMultiString(importkeys):
         pubkeys.append(single_import['pubkeys'][0])
     return pubkeys
 
-def generate_keypool(args, wrpc, devices, start, end, internal):
+def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs):
     pubkeys = []
     for dtype, d in devices.items():
         if dtype == 'core':
@@ -132,7 +132,7 @@ def generate_keypool(args, wrpc, devices, start, end, internal):
 
     print("Getting multisig keys")
     multisig_keys = []
-    for i in range(0, 100):
+    for i in range(start, end + 1):
         multisig_keys.append([])
     for pubkey_list in pubkeys:
         i = 0
@@ -147,7 +147,7 @@ def generate_keypool(args, wrpc, devices, start, end, internal):
         for key in keys:
             [(pubkey, origin)] = key.items()
             cms_list.append(pubkey)
-        ms = wrpc.createmultisig(args.n_sigs, cms_list)
+        ms = wrpc.createmultisig(n_sigs, cms_list)
         ms_addrs.append(ms['address'])
 
         # Make import multi object
@@ -167,20 +167,20 @@ def createwallet(args):
     # Error if no rpc user and pass
     if not args.rpcuser or not args.rpcpassword:
         out = {'success' : False}
-        out['error'] = '--rpcuser nad --rpcpassword must be specified in order to create a new wallet'
+        out['error'] = '--rpcuser and --rpcpassword must be specified in order to create a new wallet'
         return out
 
     devices = json.loads(args.devices)
 
     # Generate the keypools
     wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-    external = generate_keypool(args, wrpc, devices, 0, 99, False)
-    internal = generate_keypool(args, wrpc, devices, 0, 99, True)
+    external = generate_keypool(args, wrpc, devices, 0, 99, False, args.n_sigs)
+    internal = generate_keypool(args, wrpc, devices, 0, 99, True, args.n_sigs)
     data = {}
     data['external_keypool'] = external
     data['internal_keypool'] = internal
     data['external_next'] = 0
-    data['internal next'] = 0
+    data['internal_next'] = 0
 
     # Add the device info
     print("Getting device info")
@@ -207,6 +207,7 @@ def createwallet(args):
             d_meta['xpub'] = xpub
         device_info[dtype] = d_meta
     data['devices'] = device_info
+    data['nsigs'] = args.n_sigs
 
     print("Writing wallet file")
     if not os.path.exists(os.path.expanduser("~/.mshww/")):
@@ -221,7 +222,7 @@ def topupkeypool(args):
     # Error if no rpc user and pass
     if not args.rpcuser or not args.rpcpassword:
         out = {'success' : False}
-        out['error'] = '--rpcuser nad --rpcpassword must be specified in order to top up the keypool'
+        out['error'] = '--rpcuser and --rpcpassword must be specified in order to top up the keypool'
         return out
 
     # Load the watch only wallet
@@ -236,23 +237,25 @@ def topupkeypool(args):
 
     # For each of the devices, find the device paths and create the dict
     devices = {}
-    for dtype, d in wallet['devices']:
+    for dtype, d in wallet['devices'].items():
         if dtype == 'core':
-            devices['core'] == d
+            devices['core'] = d
         else:
             path = find_device_path(args, dtype, d['xpub'], d['password'] if 'password' in d else '')
             if not path:
                 out = {'success' : False}
-                out['error'] = 'Could not find a device with the xpub {}'.format(d['xpub'])
+                out['error'] = 'Could not find a {} with the xpub {}'.format(dtype, d['xpub'])
                 return out
 
-            devices[dtype]['device_path'] = path
+            device_info = {}
+            device_info['device_path'] = path
             if 'password' in d:
-                devices[dtype]['password'] = d['password']
+                device_info['password'] = d['password']
+            devices[dtype] = device_info
 
     # Generate the keypools
-    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False)
-    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True)
+    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False, wallet['nsigs'])
+    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True, wallet['nsigs'])
     wallet['external_keypool'] += external_addrs
     wallet['internal_keypool'] += internal_addrs
 
