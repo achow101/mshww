@@ -374,7 +374,10 @@ def send(args):
         out['success'] = False
         return out
     out['success'] = True
-    out['txid'] = rpc.sendrawtransaction(finalized['hex'])
+    if args.inspecttx:
+        out['tx'] = finalized['hex']
+    else:
+        out['txid'] = rpc.sendrawtransaction(finalized['hex'])
     return out
 
 def process_commands(args):
@@ -406,10 +409,11 @@ def process_commands(args):
     listused_parser.add_argument('wallet', help='Name of the wallet')
     listused_parser.set_defaults(func=listused)
 
-    signmsg_parser = subparsers.add_parser('send', help='Send Bitcoin to specified addresses')
-    signmsg_parser.add_argument('wallet', help='Name of the wallet')
-    signmsg_parser.add_argument('recipients', help='The receiving addresses and their amounts as a JSON dictionary. See Bitcoin Core\'s sendmany for format')
-    signmsg_parser.set_defaults(func=send)
+    send_parser = subparsers.add_parser('send', help='Send Bitcoin to specified addresses')
+    send_parser.add_argument('wallet', help='Name of the wallet')
+    send_parser.add_argument('recipients', help='The receiving addresses and their amounts as a JSON dictionary. See Bitcoin Core\'s sendmany for format')
+    send_parser.add_argument('--inspecttx', help='Return the fully signed transaction instead of sending to inspect it prior to sending')
+    send_parser.set_defaults(func=send)
 
     topup_parser = subparsers.add_parser('topupkeypool', help='Refills the pool of addresses so that there are 100 addresses available')
     topup_parser.add_argument('wallet', help='Name of the wallet')
