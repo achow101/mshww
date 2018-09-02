@@ -20,13 +20,20 @@ def get_rpc_port(args):
         port = 8332
     return port
 
-def load_wallet_file(wallet_file):
+def load_wallet_file(wallet_name):
     # Load the wallet file
-    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(wallet_file))
+    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(wallet_name))
     # Read the wallet file
     with open(wallet_file, 'r') as f:
         wallet = json.load(f)
     return wallet
+
+def write_wallet_to_file(wallet_name, wallet):
+    # Load the wallet file
+    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(wallet_name))
+    # Write to the wallet
+    with open(wallet_file, 'w') as f:
+        wallet = json.dump(wallet, f, indent=2)
 
 def enumerate(args):
     return hwi_command(['enumerate'])
@@ -225,8 +232,7 @@ def newaddress(args):
     wallet['external_next'] += 1
 
     # Write to the wallet
-    with open(wallet_file, 'w') as f:
-        wallet = json.dump(wallet, f, indent=2)
+    write_wallet_to_file(args.wallet, wallet)
 
     out = {}
     out['addr'] = addr
