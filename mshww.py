@@ -177,6 +177,9 @@ def createwallet(args):
 
     return {'success' : True}
 
+def topupkeypool(args):
+    pass
+
 def newaddress(args):
     wallet_file = os.path.expanduser("~/.mshww/{}.json".format(args.wallet))
     # Read the wallet file
@@ -228,12 +231,18 @@ def process_commands(args):
     newaddr_parser.set_defaults(func=newaddress)
 
     listused_parser = subparsers.add_parser('listused', help='List the addresses that have been used')
+    listused_parser.add_argument('wallet', help='Name of the wallet')
     listused_parser.add_argument('path', help='The BIP 32 derivation path to derive the key at')
     listused_parser.set_defaults(func=listused)
 
     signmsg_parser = subparsers.add_parser('send', help='Send Bitcoin to specified addresses')
+    signmsg_parser.add_argument('wallet', help='Name of the wallet')
     signmsg_parser.add_argument('recipients', help='The receiving addresses and their amounts as a JSON dictionary. See Bitcoin Core\'s sendmany for format')
     signmsg_parser.set_defaults(func=send)
+
+    topup_parser = subparsers.add_parser('topupkeypool', help='Refills the pool of addresses so that there are 100 addresses available')
+    topup_parser.add_argument('wallet', help='Name of the wallet')
+    topup_parser.set_defaults(func=topupkeypool)
 
     args = parser.parse_args(args)
 
