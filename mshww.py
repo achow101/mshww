@@ -306,7 +306,76 @@ def listused(args):
     return out
 
 def send(args):
-    pass
+    # Error if no rpc user and pass
+    if not args.rpcuser or not args.rpcpassword:
+        out = {'success' : False}
+        out['error'] = '--rpcuser and --rpcpassword must be specified in order to top up the keypool'
+        return out
+
+    # Load the watch only wallet
+    rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
+
+    # Load the wallet file
+    wallet = load_wallet_file(args.wallet)
+
+    # Get a change address from the internal keypool
+    change_addr = wallet['internal_keypool'][wallet['internal_next']]
+    wallet['internal_next'] += 1
+
+    # Write to the wallet
+    write_wallet_to_file(args.wallet, wallet)
+
+    # Create the transaction
+    outputs = json.loads(args.recipients)
+    locktime = rpc.getblockcount()
+    psbtx = rpc.walletcreatefundedpsbt([], outputs, locktime, {'changeAddress' : change_addr, 'replaceable' : True, 'includeWatching' : True}, True)
+    psbt = psbtx['psbt']
+
+    # Send psbt to devices to sign
+    out = {}
+    psbts = []
+    for dtype, d in wallet['devices'].items():
+        if dtype == 'core':
+            wrpc = LoadWalletAndGetRPC(d['wallet_name'], get_rpc_port(args), args.rpcuser, args.rpcpassword)
+            result = wrpc.walletprocesspsbt(psbt)
+            core_out = {'success' : True}
+            out['core'] = core_out
+            psbts.append(result['psbt'])
+        else:
+            d_out = {}
+            path = find_device_path(args, dtype, d['xpub'], d['password'] if 'password' in d else '')
+            if not path:
+                d_out = {'success' : False}
+                d_out['error'] = 'Could not find a {} with the xpub {}'.format(dtype, d['xpub'])
+                out[dtype] = d_out
+                continue
+
+            hwi_args = []
+            if args.testnet or args.regtest:
+                hwi_args.append('--testnet')
+            hwi_args.append('-t')
+            hwi_args.append(dtype)
+            hwi_args.append('-d')
+            hwi_args.append(path)
+            if 'password' in d:
+                hwi_args.append('-p')
+                hwi_args.append(d['password'])
+            hwi_args.append('signtx')
+            hwi_args.append(psbt)
+            result = hwi_command(hwi_args)
+            psbts.append(result['psbt'])
+            d_out['success'] = True
+            out[dtype] = d_out
+
+    # Combine, finalize, and send psbts
+    combined = rpc.combinepsbt(psbts)
+    finalized = rpc.finalizepsbt(combined)
+    if not finalized['complete']:
+        out['success'] = False
+        return out
+    out['success'] = True
+    out['txid'] = rpc.sendrawtransaction(finalized['hex'])
+    return out
 
 def process_commands(args):
     parser = argparse.ArgumentParser(description='Access and send commands to a hardware wallet device. Responses are in JSON format')
