@@ -20,6 +20,14 @@ def get_rpc_port(args):
         port = 8332
     return port
 
+def load_wallet_file(wallet_file):
+    # Load the wallet file
+    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(wallet_file))
+    # Read the wallet file
+    with open(wallet_file, 'r') as f:
+        wallet = json.load(f)
+    return wallet
+
 def enumerate(args):
     return hwi_command(['enumerate'])
 
@@ -182,10 +190,7 @@ def topupkeypool(args):
     pass
 
 def newaddress(args):
-    wallet_file = os.path.expanduser("~/.mshww/{}.json".format(args.wallet))
-    # Read the wallet file
-    with open(wallet_file, 'r') as f:
-        wallet = json.load(f)
+    wallet = load_wallet_file(args.wallet)
 
     # Fetch the next address
     keypool = wallet['external_keypool']
