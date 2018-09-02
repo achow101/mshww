@@ -61,7 +61,7 @@ def ProcessImportMultiString(importkeys):
         pubkeys.append(single_import['pubkeys'][0])
     return pubkeys
 
-def CreateWalletKeypool(args, wrpc, devices, internal):
+def generate_keypool(args, wrpc, devices, start, end, internal):
     pubkeys = []
     for dtype, d in devices.items():
         if dtype == 'core':
@@ -69,7 +69,7 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
             
             # Get 1000 pubkeys
             core_pubkeys = []
-            for i in range(0, 100):
+            for i in range(start, end + 1):
                 addrinfo = rpc.getaddressinfo(rpc.getnewaddress())
                 info = {addrinfo['pubkey'] : {addrinfo['hdmasterkeyid'] :addrinfo['hdkeypath']}}
 
@@ -93,8 +93,8 @@ def CreateWalletKeypool(args, wrpc, devices, internal):
                 hwi_args.append('m/44h/0h/0h/1')
             else:
                 hwi_args.append('m/44h/0h/0h/0')
-            hwi_args.append('0')
-            hwi_args.append('99')
+            hwi_args.append(str(start))
+            hwi_args.append(str(end))
             importkeys = hwi_command(hwi_args)
 
             pubkeys.append(ProcessImportMultiString(importkeys))
@@ -143,8 +143,8 @@ def createwallet(args):
 
     # Generate the keypools
     wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-    external = CreateWalletKeypool(args, wrpc, devices, False)
-    internal = CreateWalletKeypool(args, wrpc, devices, True)
+    external = CreateWalletKeypool(args, wrpc, devices, 0, 99, False)
+    internal = CreateWalletKeypool(args, wrpc, devices, 0, 99, True)
     data = {}
     data['external_keypool'] = external
     data['internal_keypool'] = internal
