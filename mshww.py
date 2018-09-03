@@ -148,7 +148,7 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs):
         for key in keys:
             [(pubkey, origin)] = key.items()
             cms_list.append(pubkey)
-        ms = wrpc.createmultisig(n_sigs, cms_list)
+        ms = wrpc.addmultisigaddress(n_sigs, cms_list, '', args.addrtype)
         ms_addrs.append(ms['address'])
 
         # Make import multi object
@@ -406,6 +406,7 @@ def process_commands(args):
     createwallet_parser.add_argument('wallet', help='Name of the wallet')
     createwallet_parser.add_argument('devices', help='JSON format list of devices to use. One key from each device Ex: {"core":{"wallet_name":"hww"},"coldcard":{"device_path":"000:0001:00"}}')
     createwallet_parser.add_argument('n_sigs', type=int, help='Number signatures required')
+    createwallet_parser.add_argument('--addrtype', choices=['legacy', 'p2sh-segwit', 'bech32'], help='The address types for the wallet. legacy is a p2sh multisig, p2sh-segwit is a p2wsh multisig wrapped in p2sh. bech32 is a p2wsh multisig')
     createwallet_parser.set_defaults(func=createwallet)
 
     newaddr_parser = subparsers.add_parser('getnewaddress', help='Gets the next address in the address pool')
