@@ -36,6 +36,14 @@ def write_wallet_to_file(wallet_name, wallet):
     with open(wallet_file, 'w') as f:
         wallet = json.dump(wallet, f, indent=2)
 
+def get_addrtype(args, wallet):
+    if 'addrtype' in args:
+        return args.addrtype
+    elif 'addrtype' in wallet:
+        return wallet['addrtype']
+    else:
+        return 'p2sh-segwit'
+
 def enumerate(args):
     return hwi_command(['enumerate'])
 
@@ -93,7 +101,7 @@ def ProcessImportMultiString(importkeys):
         pubkeys.append(single_import['pubkeys'][0])
     return pubkeys
 
-def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs):
+def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype):
     pubkeys = []
     for dtype, d in devices.items():
         if dtype == 'core':
@@ -148,7 +156,7 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs):
         for key in keys:
             [(pubkey, origin)] = key.items()
             cms_list.append(pubkey)
-        ms = wrpc.addmultisigaddress(n_sigs, cms_list, '', args.addrtype)
+        ms = wrpc.addmultisigaddress(n_sigs, cms_list, '', addrtype)
         ms_addrs.append(ms['address'])
 
         # Make import multi object
@@ -175,8 +183,8 @@ def createwallet(args):
 
     # Generate the keypools
     wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-    external = generate_keypool(args, wrpc, devices, 0, 99, False, args.n_sigs)
-    internal = generate_keypool(args, wrpc, devices, 0, 99, True, args.n_sigs)
+    external = generate_keypool(args, wrpc, devices, 0, 99, False, args.n_sigs, get_addrtype(args, {}))
+    internal = generate_keypool(args, wrpc, devices, 0, 99, True, args.n_sigs, get_addrtype(args, {}))
     data = {}
     data['external_keypool'] = external
     data['internal_keypool'] = internal
@@ -209,6 +217,7 @@ def createwallet(args):
         device_info[dtype] = d_meta
     data['devices'] = device_info
     data['nsigs'] = args.n_sigs
+    data['addrtype'] = get_addrtype(args, {})
 
     print("Writing wallet file")
     if not os.path.exists(os.path.expanduser("~/.mshww/")):
@@ -255,8 +264,8 @@ def topupkeypool(args):
             devices[dtype] = device_info
 
     # Generate the keypools
-    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False, wallet['nsigs'])
-    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True, wallet['nsigs'])
+    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False, wallet['nsigs'], get_addrtype(args, wallet))
+    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True, wallet['nsigs'], get_addrtype(args, wallet))
     wallet['external_keypool'] += external_addrs
     wallet['internal_keypool'] += internal_addrs
 
