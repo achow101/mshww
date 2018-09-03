@@ -2,6 +2,7 @@
 
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 from hwilib.commands import process_commands as hwi_command
+from hwilib.serializations import PSBT
 
 import argparse
 import sys
@@ -330,6 +331,13 @@ def send(args):
     locktime = rpc.getblockcount()
     psbtx = rpc.walletcreatefundedpsbt([], outputs, locktime, {'changeAddress' : change_addr, 'replaceable' : True, 'includeWatching' : True}, True)
     psbt = psbtx['psbt']
+
+    # HACK: Hack to prevent change detection because hardware wallets are apparently really bad at change detection for multisig change
+    tx = PSBT()
+    tx.deserialize(psbt)
+    for output in tx.outputs:
+        output.set_null()
+    psbt = tx.serialize()
 
     # Send psbt to devices to sign
     out = {}
