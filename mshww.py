@@ -3,6 +3,8 @@
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 from hwilib.commands import process_commands as hwi_command
 from hwilib.serializations import PSBT
+from hwilib.base58 import get_xpub_fingerprint_as_id
+from bip32utils import BIP32Key
 
 import argparse
 import sys
@@ -115,6 +117,25 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype
 
                 core_pubkeys.append(info)
             pubkeys.append(core_pubkeys)
+        elif 'xpub' in d and 'master_fpr' in d:
+            parent = BIP32Key.fromExtendedKey(d['xpub'])
+            if internal:
+                parent = parent.ChildKey(1)
+                path_base = 'm/44h/0h/0h/1/'
+            else:
+                parent = parent.ChildKey(0)
+                path_base = 'm/44h/0h/0h/0/'
+
+            import_pubkeys = []
+            for i in range(start, end + 1):
+                this_import = {}
+                path = path_base + str(i)
+
+                child = parent.ChildKey(i)
+                address = child.Address()
+
+                import_pubkeys.append({binascii.hexlify(child.PublicKey()).decode() : {d['master_fpr'] : path}})
+            pubkeys.append(import_pubkeys)
         else:
             print("Loading a {} wallet".format(dtype))
             # Common for all hww
@@ -210,10 +231,10 @@ def createwallet(args):
             if 'password' in d:
                 hwi_args.append('-p')
                 hwi_args.append(d['password'])
-            hwi_args.append('getmasterxpub')
-            xpub = hwi_command(hwi_args)['xpub']
+            xpub = hwi_command(hwi_args + ['getmasterxpub'])['xpub']
 
             d_meta['xpub'] = xpub
+            d_meta['master_fpr'] = get_xpub_fingerprint_as_id(hwi_command(hwi_args + ['getxpub', 'm/0h'])['xpub'])
         device_info[dtype] = d_meta
     data['devices'] = device_info
     data['nsigs'] = args.n_sigs
@@ -245,27 +266,9 @@ def topupkeypool(args):
     external_end = wallet['external_next'] + 100
     internal_end = wallet['internal_next'] + 100
 
-    # For each of the devices, find the device paths and create the dict
-    devices = {}
-    for dtype, d in wallet['devices'].items():
-        if dtype == 'core':
-            devices['core'] = d
-        else:
-            path = find_device_path(args, dtype, d['xpub'], d['password'] if 'password' in d else '')
-            if not path:
-                out = {'success' : False}
-                out['error'] = 'Could not find a {} with the xpub {}'.format(dtype, d['xpub'])
-                return out
-
-            device_info = {}
-            device_info['device_path'] = path
-            if 'password' in d:
-                device_info['password'] = d['password']
-            devices[dtype] = device_info
-
     # Generate the keypools
-    external_addrs = generate_keypool(args, rpc, devices, external_start, external_end, False, wallet['nsigs'], get_addrtype(args, wallet))
-    internal_addrs = generate_keypool(args, rpc, devices, internal_start, internal_end, True, wallet['nsigs'], get_addrtype(args, wallet))
+    external_addrs = generate_keypool(args, rpc, wallet['devices'], external_start, external_end, False, wallet['nsigs'], get_addrtype(args, wallet))
+    internal_addrs = generate_keypool(args, rpc, wallet['devices'], internal_start, internal_end, True, wallet['nsigs'], get_addrtype(args, wallet))
     wallet['external_keypool'] += external_addrs
     wallet['internal_keypool'] += internal_addrs
 
