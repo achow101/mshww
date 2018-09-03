@@ -7,3 +7,7 @@ This software handles communicating with Core and hardware wallets for signing a
 ## How it works
 
 When a wallet is created, a new Bitcoin Core watching only wallet (with private keys disabled) is created. This wallet holds all of the imported scripts and public keys. Keys are taken from the specified Core wallet and hardware devices. These keys are used to create a multisig address which is imported into the watching only wallet. The watching only wallet is then used to construct PSBTs and given to the hardware devices and the Core wallet to sign when a send is done.
+
+## License
+
+This software is licensed under the MIT License. See [LICENSE](LICENSE) for more information.
