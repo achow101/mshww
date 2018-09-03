@@ -156,7 +156,7 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs):
         this_import['redeemscript'] = ms['redeemScript']
         this_import['pubkeys'] = keys
         this_import['timestamp'] = 'now'
-        this_import['keypool'] = True
+        this_import['keypool'] = False
         this_import['watch_only'] = True
         this_import['internal'] = internal
         wrpc.importmulti([this_import])
@@ -372,6 +372,7 @@ def send(args):
     finalized = rpc.finalizepsbt(combined)
     if not finalized['complete']:
         out['success'] = False
+        out['psbt'] = finalized['psbt']
         return out
     out['success'] = True
     if args.inspecttx:
@@ -412,7 +413,7 @@ def process_commands(args):
     send_parser = subparsers.add_parser('send', help='Send Bitcoin to specified addresses')
     send_parser.add_argument('wallet', help='Name of the wallet')
     send_parser.add_argument('recipients', help='The receiving addresses and their amounts as a JSON dictionary. See Bitcoin Core\'s sendmany for format')
-    send_parser.add_argument('--inspecttx', help='Return the fully signed transaction instead of sending to inspect it prior to sending')
+    send_parser.add_argument('--inspecttx', help='Return the fully signed transaction instead of sending to inspect it prior to sending', action='store_true')
     send_parser.set_defaults(func=send)
 
     topup_parser = subparsers.add_parser('topupkeypool', help='Refills the pool of addresses so that there are 100 addresses available')
