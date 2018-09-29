@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
-from hwilib.commands import process_commands as hwi_command
+from hwilib.commands import process_commands
 from hwilib.serializations import PSBT
 from hwilib.base58 import get_xpub_fingerprint_as_id
 from bip32utils import BIP32Key
@@ -45,6 +45,12 @@ def get_addrtype(args, wallet):
         return wallet['addrtype']
     else:
         return 'p2sh-segwit'
+
+def hwi_command(args):
+    result = process_commands(args)
+    if 'error' in result:
+        raise ValueError(result['error'])
+    return result
 
 def enumerate(args):
     return hwi_command(['enumerate'])
