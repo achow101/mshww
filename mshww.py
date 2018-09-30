@@ -123,7 +123,8 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype
 
                 core_pubkeys.append(info)
             pubkeys.append(core_pubkeys)
-        elif 'xpub' in d and 'master_fpr' in d:
+        elif 'xpub' in d and 'fingerprint' in d:
+            print("xpub")
             parent = BIP32Key.fromExtendedKey(d['xpub'])
             if internal:
                 parent = parent.ChildKey(1)
@@ -140,18 +141,16 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype
                 child = parent.ChildKey(i)
                 address = child.Address()
 
-                import_pubkeys.append({binascii.hexlify(child.PublicKey()).decode() : {d['master_fpr'] : path}})
+                import_pubkeys.append({binascii.hexlify(child.PublicKey()).decode() : {d['fingerprint'] : path}})
             pubkeys.append(import_pubkeys)
         else:
-            print("Loading a {} wallet".format(dtype))
+            print("HWW")
             # Common for all hww
             hwi_args = []
             if args.testnet or args.regtest:
                 hwi_args.append('--testnet')
-            hwi_args.append('-t')
-            hwi_args.append(dtype)
-            hwi_args.append('-d')
-            hwi_args.append(d['device_path'])
+            hwi_args.append('-f')
+            hwi_args.append(d['fingerprint'])
             if 'password' in d:
                 hwi_args.append('-p')
                 hwi_args.append(d['password'])
@@ -230,18 +229,16 @@ def createwallet(args):
             hwi_args = []
             if args.testnet or args.regtest:
                 hwi_args.append('--testnet')
-            hwi_args.append('-t')
-            hwi_args.append(dtype)
-            hwi_args.append('-d')
-            hwi_args.append(d['device_path'])
+            hwi_args.append('-f')
+            hwi_args.append(d['fingerprint'])
             if 'password' in d:
                 hwi_args.append('-p')
                 hwi_args.append(d['password'])
             xpub = hwi_command(hwi_args + ['getmasterxpub'])['xpub']
 
             d_meta['xpub'] = xpub
-            d_meta['master_fpr'] = get_xpub_fingerprint_as_id(hwi_command(hwi_args + ['getxpub', 'm/0h'])['xpub'])
-        device_info[dtype] = d_meta
+            d_meta['fingerprint'] = d['fingerprint']
+        device_info.append(d_meta)
     data['devices'] = device_info
     data['nsigs'] = args.n_sigs
     data['addrtype'] = get_addrtype(args, {})
@@ -369,27 +366,20 @@ def send(args):
             psbts.append(result['psbt'])
         else:
             d_out = {}
-            path = find_device_path(args, dtype, d['xpub'], d['password'] if 'password' in d else '')
-            if not path:
-                d_out = {'success' : False}
-                d_out['error'] = 'Could not find a {} with the xpub {}'.format(dtype, d['xpub'])
-                out[dtype] = d_out
-                continue
 
             hwi_args = []
             if args.testnet or args.regtest:
                 hwi_args.append('--testnet')
-            hwi_args.append('-t')
-            hwi_args.append(dtype)
-            hwi_args.append('-d')
-            hwi_args.append(path)
             if 'password' in d:
                 hwi_args.append('-p')
                 hwi_args.append(d['password'])
+            hwi_args.append('-f')
+            hwi_args.append(d['fingerprint'])
             hwi_args.append('signtx')
             hwi_args.append(psbt)
             result = hwi_command(hwi_args)
             psbts.append(result['psbt'])
+            d_out['fingerprint'] = d['fingerprint']
             d_out['success'] = True
             out[dtype] = d_out
 
