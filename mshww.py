@@ -13,16 +13,6 @@ import urllib
 import binascii
 import os
 
-def get_rpc_port(args):
-    # Get the correct port
-    if args.testnet:
-        port = 18332
-    elif args.regtest:
-        port = 18443
-    else:
-        port = 8332
-    return port
-
 def load_wallet_file(wallet_name):
     # Load the wallet file
     wallet_file = os.path.expanduser("~/.mshww/{}.json".format(wallet_name))
@@ -55,41 +45,17 @@ def hwi_command(args):
 def enumerate(args):
     return hwi_command(['enumerate'])
 
-def find_device_path(args, dtype, xpub, password = ''):
-    devices = enumerate([])
-    for device in devices:
-        # Check devices with the same type
-        if device['type'] == dtype:
-            # Fetch the master xpub from the device
-            hwi_args = []
-            if args.testnet or args.regtest:
-                hwi_args.append('--testnet')
-            hwi_args.append('-t')
-            hwi_args.append(device['type'])
-            hwi_args.append('-d')
-            hwi_args.append(device['path'])
-            if password:
-                hwi_args.append('-p')
-                hwi_args.append(password)
-            hwi_args.append('getmasterxpub')
-            d_xpub = hwi_command(hwi_args)['xpub']
-
-            # If the xpub matches, then we found our device
-            if d_xpub == xpub:
-                return device['path']
-    return ''
-
-def CreateWalletAndGetRPC(wallet_name, port, user, password):
+def CreateWalletAndGetRPC(wallet_name, rpcurl):
     print("Making Core wallet")
-    rpc = AuthServiceProxy("http://{}:{}@127.0.0.1:{}".format(user, password, port))
+    rpc = AuthServiceProxy(rpcurl)
     rpc.createwallet(wallet_name, True)
 
     wallet_path = "/wallet/{}".format(urllib.parse.quote(wallet_name))
-    return AuthServiceProxy("http://{}:{}@127.0.0.1:{}{}".format(user, password, port, wallet_path))
+    return AuthServiceProxy("{}{}".format(rpcurl, wallet_path))
 
-def LoadWalletAndGetRPC(wallet_name, port, user, password):
+def LoadWalletAndGetRPC(wallet_name, url):
     print("Loading a Core wallet")
-    rpc = AuthServiceProxy("http://{}:{}@127.0.0.1:{}".format(user, password, port))
+    rpc = AuthServiceProxy(url)
     if wallet_name:
         wallets = rpc.listwallets()
         if wallet_name not in wallets:
@@ -99,7 +65,7 @@ def LoadWalletAndGetRPC(wallet_name, port, user, password):
                 rpc.createwallet(wallet_name)
         
         wallet_path = "/wallet/{}".format(urllib.parse.quote(wallet_name))
-        return AuthServiceProxy("http://{}:{}@127.0.0.1:{}{}".format(user, password, port, wallet_path))
+        return AuthServiceProxy("{}{}".format(url, wallet_path))
     else:
         return rpc
 
@@ -111,9 +77,10 @@ def ProcessImportMultiString(importkeys):
 
 def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype):
     pubkeys = []
-    for dtype, d in devices.items():
-        if dtype == 'core':
-            rpc = LoadWalletAndGetRPC(d['wallet_name'], get_rpc_port(args), args.rpcuser, args.rpcpassword)
+    for d in devices:
+        if 'core_wallet_name' in d:
+            print("core")
+            rpc = LoadWalletAndGetRPC(d['core_wallet_name'], d['rpcurl'])
             
             # Get 1000 pubkeys
             core_pubkeys = []
@@ -200,15 +167,15 @@ def generate_keypool(args, wrpc, devices, start, end, internal, n_sigs, addrtype
 
 def createwallet(args):
     # Error if no rpc user and pass
-    if not args.rpcuser or not args.rpcpassword:
+    if not args.rpcurl:
         out = {'success' : False}
-        out['error'] = '--rpcuser and --rpcpassword must be specified in order to create a new wallet'
+        out['error'] = '--rpcurl must be specified in order to create a new wallet'
         return out
 
     devices = json.loads(args.devices)
 
     # Generate the keypools
-    wrpc = CreateWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
+    wrpc = CreateWalletAndGetRPC(args.wallet, args.rpcurl)
     external = generate_keypool(args, wrpc, devices, 0, 99, False, args.n_sigs, get_addrtype(args, {}))
     internal = generate_keypool(args, wrpc, devices, 0, 99, True, args.n_sigs, get_addrtype(args, {}))
     data = {}
@@ -219,11 +186,11 @@ def createwallet(args):
 
     # Add the device info
     print("Getting device info")
-    device_info = {}
-    for dtype, d in devices.items():
+    device_info = []
+    for d in devices:
         d_meta = {}
-        if dtype == 'core':
-            d_meta['wallet_name'] = d['wallet_name']
+        if 'core_wallet_name' in d:
+            d_meta = d
         else:
             # Common for all hww
             hwi_args = []
@@ -242,6 +209,8 @@ def createwallet(args):
     data['devices'] = device_info
     data['nsigs'] = args.n_sigs
     data['addrtype'] = get_addrtype(args, {})
+    data['name'] = args.wallet
+    data['rpcurl'] = args.rpcurl
 
     print("Writing wallet file")
     if not os.path.exists(os.path.expanduser("~/.mshww/")):
@@ -253,21 +222,15 @@ def createwallet(args):
     return {'success' : True}
 
 def topupkeypool(args):
-    # Error if no rpc user and pass
-    if not args.rpcuser or not args.rpcpassword:
-        out = {'success' : False}
-        out['error'] = '--rpcuser and --rpcpassword must be specified in order to top up the keypool'
-        return out
-
-    # Load the watch only wallet
-    rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-
     # Load the wallet file and get keypool info
     wallet = load_wallet_file(args.wallet)
     external_start = len(wallet['external_keypool'])
     internal_start = len(wallet['internal_keypool'])
     external_end = wallet['external_next'] + 100
     internal_end = wallet['internal_next'] + 100
+
+    # Load the watch only wallet
+    rpc = LoadWalletAndGetRPC(args.wallet, wallet['rpcurl'])
 
     # Generate the keypools
     external_addrs = generate_keypool(args, rpc, wallet['devices'], external_start, external_end, False, wallet['nsigs'], get_addrtype(args, wallet))
@@ -304,11 +267,8 @@ def newaddress(args):
 
     # Add the label to the wallet
     if args.label:
-        if args.rpcpassword and args.rpcuser:
-            rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-            rpc.setlabel(addr, args.label)
-        else:
-            out['error'] = '--rpcuser and --rpcpassword necessary to set a label'
+        rpc = LoadWalletAndGetRPC(args.wallet, wallet['rpcurl'])
+        rpc.setlabel(addr, args.label)
 
     return out
 
@@ -322,17 +282,11 @@ def listused(args):
     return out
 
 def send(args):
-    # Error if no rpc user and pass
-    if not args.rpcuser or not args.rpcpassword:
-        out = {'success' : False}
-        out['error'] = '--rpcuser and --rpcpassword must be specified in order to top up the keypool'
-        return out
-
-    # Load the watch only wallet
-    rpc = LoadWalletAndGetRPC(args.wallet, get_rpc_port(args), args.rpcuser, args.rpcpassword)
-
     # Load the wallet file
     wallet = load_wallet_file(args.wallet)
+
+    # Load the watch only wallet
+    rpc = LoadWalletAndGetRPC(args.wallet, wallet['rpcurl'])
 
     # Get a change address from the internal keypool
     change_addr = wallet['internal_keypool'][wallet['internal_next']]
@@ -356,10 +310,11 @@ def send(args):
 
     # Send psbt to devices to sign
     out = {}
+    out['devices'] = []
     psbts = []
-    for dtype, d in wallet['devices'].items():
-        if dtype == 'core':
-            wrpc = LoadWalletAndGetRPC(d['wallet_name'], get_rpc_port(args), args.rpcuser, args.rpcpassword)
+    for d in wallet['devices']:
+        if 'core_wallet_name' in d:
+            wrpc = LoadWalletAndGetRPC(d['core_wallet_name'], d['rpcurl'])
             result = wrpc.walletprocesspsbt(psbt)
             core_out = {'success' : True}
             out['core'] = core_out
@@ -381,7 +336,7 @@ def send(args):
             psbts.append(result['psbt'])
             d_out['fingerprint'] = d['fingerprint']
             d_out['success'] = True
-            out[dtype] = d_out
+            out['devices'].append(d_out)
 
     # Combine, finalize, and send psbts
     combined = rpc.combinepsbt(psbts)
@@ -397,10 +352,9 @@ def send(args):
         out['txid'] = rpc.sendrawtransaction(finalized['hex'])
     return out
 
-def process_commands(args):
+def parse_command(args):
     parser = argparse.ArgumentParser(description='Access and send commands to a hardware wallet device. Responses are in JSON format')
-    parser.add_argument('--rpcuser', help='The username to the Bitcoin Core RPC interface')
-    parser.add_argument('--rpcpassword', help='The password to the Bitcoin Core RPC interface')
+    parser.add_argument('--rpcurl', help='URL for the Bitcoin Core RPC interface that has (or will have) the watching only wallet. Of the form "http://<rpcuser>:<rpcpassword>@<IP address>:<rpcport>"')
     parser.add_argument('--testnet', help='Use testnet', action='store_true')
     parser.add_argument('--regtest', help='Use regtest', action='store_true')
 
@@ -412,7 +366,7 @@ def process_commands(args):
 
     createwallet_parser = subparsers.add_parser('createwallet', help='Create a new wallet')
     createwallet_parser.add_argument('wallet', help='Name of the wallet')
-    createwallet_parser.add_argument('devices', help='JSON format list of devices to use. One key from each device Ex: {"core":{"wallet_name":"hww"},"coldcard":{"device_path":"000:0001:00"}}')
+    createwallet_parser.add_argument('devices', help='JSON format list of device fingerprints or Bitcoin Core wallet names to use. One key from each device Ex: [{"core_wallet_name":"hww","rpcurl":"http://<rpcuser>:<rpcpassword>@<IP address>:<rpcport>"},{"fingerprint":"8038ecd9"}]')
     createwallet_parser.add_argument('n_sigs', type=int, help='Number signatures required')
     createwallet_parser.add_argument('--addrtype', choices=['legacy', 'p2sh-segwit', 'bech32'], help='The address types for the wallet. legacy is a p2sh multisig, p2sh-segwit is a p2wsh multisig wrapped in p2sh. bech32 is a p2wsh multisig')
     createwallet_parser.set_defaults(func=createwallet)
@@ -447,4 +401,4 @@ def process_commands(args):
 
 
 if __name__ == '__main__':
-    print(json.dumps(process_commands(sys.argv[1:])))
+    print(json.dumps(parse_command(sys.argv[1:])))
